@@ -1,11 +1,12 @@
 {
-  "language.en_US": "英语 (美国)",
-  "language.pl_PL": "波兰语",
-  "language.es_ES": "西班牙语",
-  "language.pt_BR": "葡萄牙语 (巴西)",
-  "language.ja_JP": "日语",
-  "language.ru_RU": "俄语",
+  "language.en_US": "English (US)",
+  "language.pl_PL": "Polski",
+  "language.es_ES": "Español",
+  "language.pt_BR": "Português (Brasil)",
+  "language.ja_JP": "日本語",
+  "language.ru_RU": "Русский",
   "language.zh_CN": "简体中文",
+  "language.ar_MS": "العربية (الفصحى)",
   "tab.recents": "最近打开",
   "tab.games": "游戏列表",
   "tab.apps": "应用工具",
@@ -30,6 +31,7 @@
   "settings.animations": "界面动画",
   "settings.menu_sounds": "菜单音效",
   "settings.battery_colour_mode": "电池颜色模式",
+  "settings.stock_battery_indicator": "Stock Battery Indicator",
   "settings.background_images": "背景图片",
   "settings.background_dim": "背景明暗度",
   "settings.wallpaper": "壁纸设置",
@@ -65,20 +67,13 @@
   "header.add_extension": "添加扩展名",
   "header.usb_mode": "USB 连接模式",
   "remap.skip": "[B] = 跳过 / 保持默认值",
-  "remap.press": "按下  %s  (%d / %d)"
- ,
-  "remap.saved": "按键映射已保存"
-  ,
-  "remap.save_failed": "无法保存按键映射"
-  ,
-  "button.up": "上"
-  ,
-  "button.down": "下"
-  ,
-  "button.left": "左"
-  ,
-  "button.right": "右"
-  ,
+  "remap.press": "按下  %s  (%d / %d)",
+  "remap.saved": "按键映射已保存",
+  "remap.save_failed": "无法保存按键映射",
+  "button.up": "上",
+  "button.down": "下",
+  "button.left": "左",
+  "button.right": "右",
   "picker.cores": "核心列表",
   "picker.extensions": "扩展名列表",
   "picker.filter_files": "筛选文件",

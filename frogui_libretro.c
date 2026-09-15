@@ -58,6 +58,7 @@ static char g_roms_path[512] = ROMS_PATH_DEFAULT;
 #define VIDEO_BIN    SDCARD_BASE "/cubegm/video_player" /* hardware-decoded video player */
 #define IMAGE_BIN    SDCARD_BASE "/cubegm/image_viewer" /* hardware-decoded image viewer */
 #define PPSSPP_BIN   SDCARD_BASE "/cubegm/ppsspp"       /* optional standalone SF3000 port */
+#define DSPERATE_BIN SDCARD_BASE "/cubegm/dsperate/run_sf3000.sh"
 #define FROGSHELL_CORE CORES_PATH "/frogshell_libretro.so" /* file manager via picoarch */
 #define USB_MODE_BIN SDCARD_BASE "/cubegm/usb_mtp.sh"  /* expose the SD card to a USB host */
 #define SHUTDOWN_BIN SDCARD_BASE "/cubegm/shutdown.sh"  /* power off the console */
@@ -152,6 +153,7 @@ static const ConsoleMapping console_mappings[] = {
     /* Misc */
     {"pico8",  CORES_PATH "/fake08_libretro.so"},   /* PICO-8 (fake08 core) */
     {"pico286", PICO286_BIN},                        /* DOS PC (standalone, launched directly) */
+    {"nds",    DSPERATE_BIN},                        /* Nintendo DS (DSperate standalone) */
     {"lgpt",   LGPT_BIN},                            /* LittleGPTracker (standalone, launched directly) */
     {"rockbox", ROCKBOX_BIN},                        /* Rockbox music player (standalone) */
     {"Ebook",  EBOOK_BIN},                           /* ebook reader (epub/mobi/pdf, standalone) */
@@ -517,7 +519,9 @@ static bool usb_mode_raw_edge(FrogButton button, uint32_t raw) {
  * fb1 is rotated and/or double-buffered on SF3500-class devices, so physical
  * top-right is not reliably memory top-right and the active page is not always
  * page zero. Clear every memory corner on every virtual page. */
+static int frogui_stock_battery_indicator(void);
 static void fb1_clear_battery_zone(void) {
+	if (frogui_stock_battery_indicator()) return;
     /* Persistent mmap + cached geometry: open/mmap ONCE. The old per-frame
      * open+ioctl+mmap+munmap+close stalled the loop (visible input lag).
      * Do not latch a failed first attempt: early boot may reach FrogUI before
@@ -594,10 +598,10 @@ static void fb1_clear_all(void) {
  * clears cubevol's battery corner each call so its glyph stays hidden. Called by
  * render_header (every screen, every frame). */
 static int raw_to_pct(int raw) {
-    /* This ADC is too noisy and device-dependent for a truthful percentage.
-     * Use three broad states; give the full state a deliberately wide range. */
-    if (raw < 100) return 25;
-    if (raw < 145) return 50;
+    /* R36SX packs measure about 64 empty, 153 half and 180 full. */
+    if (raw <= 64) return 0;
+    if (raw <= 153) return (raw - 64) * 50 / (153 - 64);
+    if (raw < 180) return 50 + (raw - 153) * 50 / (180 - 153);
     return 100;
 }
 /* Persistent ADC fds, opened O_RDWR ONCE like cubevol (battery_adc_init) - these
@@ -619,6 +623,7 @@ static int g_batt_charging = 0;
 int frogui_battery_charging(void) { return g_batt_charging; }
 int frogui_battery_color_mode(void);   /* defined after settings_battery_color */
 int frogui_battery_pct(void) {
+	if (frogui_stock_battery_indicator()) return -1;
     static int cached = -1, tick = 0;
     if (cached < 0 || (tick++ % 300) == 0) {
         int a1 = read_adc(0), a5 = read_adc(1);
@@ -873,6 +878,7 @@ static int settings_backgrounds = 1;     /* show per-system background images: 0
 static int settings_background_dim = 15; /* darken background artwork: 0=unchanged, 100=black */
 static int settings_file_cache = 1;      /* cache folder listings (mtime-keyed) for fast nav: 0=off, 1=on */
 static int settings_battery_color = 0;   /* "Nel Battery Mode": solid color light by level instead of fill bar */
+static int settings_stock_battery = 0;   /* cubevol's original fb1 indicator */
 enum { LANGUAGE_EN_US, LANGUAGE_PL_PL, LANGUAGE_ES_ES, LANGUAGE_PT_BR, LANGUAGE_JA_JP,
        LANGUAGE_RU_RU, LANGUAGE_ZH_CN,LANGUAGE_AR_MS,LANGUAGE_IT_IT,LANGUAGE_FR_FR, LANGUAGE_COUNT };
 static int settings_language = LANGUAGE_EN_US;
@@ -903,6 +909,7 @@ static void theme_sync_artwork_pack(void) {
 }
 
 int frogui_battery_color_mode(void) { return settings_battery_color; }
+static int frogui_stock_battery_indicator(void) { return settings_stock_battery; }
 static int settings_game_switcher = 1;  /* recents as box-art carousel: 0=off, 1=on */
 static int settings_load_recents = 0;   /* start FrogUI in the recents view: 0=off, 1=on */
 enum { ROM_SOURCE_SD, ROM_SOURCE_OTG, ROM_SOURCE_COUNT };
@@ -933,7 +940,7 @@ typedef struct {
 } SRow;
 
 static const SRow settings_rows[] = {
-    { RT_HEADER, "settings.appearance" }, { RT_THEME, "settings.theme" }, { RT_THEME_PACK, "settings.background_theme_pack" }, { RT_STYLE, "settings.style" }, { RT_ICON_PACK, "settings.icon_pack" }, { RT_TOGGLE, "settings.center_text", &settings_center_text }, { RT_TOGGLE, "settings.friendly_system_names", &settings_friendly_names }, { RT_FONT, "settings.font" }, { RT_RANGE, "settings.font_size", &settings_font_size, 18, 26, 1 }, { RT_TOGGLE, "settings.battery_colour_mode", &settings_battery_color }, { RT_TOGGLE, "settings.background_images", &settings_backgrounds }, { RT_RANGE, "settings.background_dim", &settings_background_dim, 0, 100, 5 }, { RT_WALLPAPER, "settings.wallpaper" }, { RT_WALLFIT, "settings.background_image_fit" },
+    { RT_HEADER, "settings.appearance" }, { RT_THEME, "settings.theme" }, { RT_THEME_PACK, "settings.background_theme_pack" }, { RT_STYLE, "settings.style" }, { RT_ICON_PACK, "settings.icon_pack" }, { RT_TOGGLE, "settings.center_text", &settings_center_text }, { RT_TOGGLE, "settings.friendly_system_names", &settings_friendly_names }, { RT_FONT, "settings.font" }, { RT_RANGE, "settings.font_size", &settings_font_size, 18, 26, 1 }, { RT_TOGGLE, "settings.battery_colour_mode", &settings_battery_color }, { RT_TOGGLE, "settings.stock_battery_indicator", &settings_stock_battery }, { RT_TOGGLE, "settings.background_images", &settings_backgrounds }, { RT_RANGE, "settings.background_dim", &settings_background_dim, 0, 100, 5 }, { RT_WALLPAPER, "settings.wallpaper" }, { RT_WALLFIT, "settings.background_image_fit" },
     { RT_HEADER, "settings.general" }, { RT_LANGUAGE, "settings.language", &settings_language }, { RT_RANGE, "settings.brightness", &settings_brightness, 0, 100, SETTINGS_BRIGHTNESS_STEP }, { RT_TOGGLE, "settings.animations", &settings_anim }, { RT_TOGGLE, "settings.menu_sounds", &settings_menu_sounds }, { RT_TOGGLE, "settings.hide_extensions", &settings_hide_extensions }, { RT_TOGGLE, "settings.hide_empty_folders", &settings_hide_empty },
     { RT_HEADER, "settings.library" }, { RT_ROM_SOURCE, "settings.rom_source" }, { RT_OTG_STATUS, "settings.otg_storage" }, { RT_TOGGLE, "settings.game_switcher", &settings_game_switcher }, { RT_TOGGLE, "settings.start_in_recents", &settings_load_recents },
     { RT_HEADER, "settings.gameplay" }, { RT_TOGGLE, "settings.quick_resume", &settings_quick_resume }, { RT_TOGGLE, "settings.autosave_autoload", &settings_autosave_autoload }, { RT_TOGGLE, "settings.custom_aspect_ratios", &settings_custom_aspect_ratios },
@@ -1282,6 +1289,8 @@ static void settings_load_file(void) {
             settings_file_cache = (strcmp(val, "on") == 0) ? 1 : 0;
         } else if (strcmp(line, "battery_color") == 0) {
             settings_battery_color = (strcmp(val, "on") == 0) ? 1 : 0;
+        } else if (strcmp(line, "stock_battery") == 0) {
+            settings_stock_battery = (strcmp(val, "on") == 0) ? 1 : 0;
         } else if (strcmp(line, "disable_sleep") == 0) {
             settings_disable_sleep = (strcmp(val, "on") == 0) ? 1 : 0;
         } else if (strcmp(line, "game_switcher") == 0) {
@@ -1369,6 +1378,7 @@ static void settings_save_file(void) {
     fprintf(f, "background_dim=%d\n", settings_background_dim);
     fprintf(f, "file_cache=%s\n", onoff_names[settings_file_cache]);
     fprintf(f, "battery_color=%s\n", onoff_names[settings_battery_color]);
+    fprintf(f, "stock_battery=%s\n", onoff_names[settings_stock_battery]);
     fprintf(f, "game_switcher=%s\n", onoff_names[settings_game_switcher]);
     fprintf(f, "load_recents=%s\n", onoff_names[settings_load_recents]);
     fprintf(f, "rom_source=%s\n", rom_source_names[settings_rom_source]);
@@ -1467,7 +1477,7 @@ static SystemLabel system_labels[] = {
     {"vb", "Virtual Boy"}, {"pcfx", "PC-FX"},
     {"ps", "PlayStation"}, {"psx", "PlayStation"},
     {"ps1", "PlayStation"}, {"ps1r", "PlayStation - ReARMed"},
-    {"psp", "PlayStation Portable"},
+    {"psp", "PlayStation Portable"}, {"nds", "Nintendo DS"},
     {"arcade", "Arcade"}, {"m2k", "Arcade - MAME 2000"}, {"cps1", "Arcade - Capcom CPS-1"},
     {"cps2", "Arcade - Capcom CPS-2"}, {"cps3", "Arcade - Capcom CPS-3"},
     {"c64", "Commodore 64"}, {"c64sc", "Commodore 64"},
@@ -2573,6 +2583,7 @@ static void request_standalone_launch(const char *bin_path, const char *rom_path
     if (!f) { dbg("standalone_launch: fopen failed"); return; }
     fprintf(f, "standalone\n%s\n%s\n", bin_path, rom_path);
     fclose(f);
+    sync(); /* flush FAT32 before picoarch reads the standalone handoff */
     dbg("standalone_launch: file written");
     const char *rom_base = strrchr(rom_path, '/');
     rom_base = rom_base ? rom_base + 1 : rom_path;
@@ -2637,7 +2648,8 @@ static bool is_standalone_bin(const char *name) {
                     strcmp(name, EBOOK_BIN)    == 0 ||
                     strcmp(name, VIDEO_BIN)    == 0 ||
                     strcmp(name, IMAGE_BIN)    == 0 ||
-                    strcmp(name, PPSSPP_BIN)   == 0);
+                    strcmp(name, PPSSPP_BIN)   == 0 ||
+                    strcmp(name, DSPERATE_BIN) == 0);
 }
 
 /* ----------------------------- Search (X button) ----------------------------- */
